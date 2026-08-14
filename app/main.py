@@ -1,10 +1,20 @@
 from fastapi import FastAPI, Request
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
+from app.core.config import settings
 from app.exceptions import AppError
 
 
 app = FastAPI()
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=settings.middleware.allow_origins,
+    allow_methods=settings.middleware.allow_methods,
+    allow_headers=settings.middleware.allow_headers,
+    allow_credentials=settings.middleware.allow_credentials
+)
 
 
 @app.exception_handler(AppError)
