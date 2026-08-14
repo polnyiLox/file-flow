@@ -11,6 +11,10 @@ class DataBaseSettings(BaseModel):
     port: int
     name: str
 
+    @property
+    def url(self) -> str:
+        return f"postgresql+asyncpg://{self.user}:{self.password}@{self.host}:{self.port}/{self.name}"
+
 
 class ApiSettings(BaseModel):
     v1_prefix: str
