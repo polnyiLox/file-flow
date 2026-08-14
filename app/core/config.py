@@ -10,8 +10,16 @@ class DataBaseSettings(BaseModel):
     name: str
 
 
+class ApiSettings(BaseModel):
+    v1_prefix: str
+    host: str
+    port: int
+    reload: bool
+
+
 class Settings(BaseSettings):
     db: DataBaseSettings
+    api: ApiSettings
 
     model_config = SettingsConfigDict(
         env_file=".env",
