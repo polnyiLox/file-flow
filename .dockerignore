@@ -1,0 +1,15 @@
+.venv
+__pycache__
+.pytest_cache
+.mypy_cache
+.coverage
+
+.git
+.gitignore
+
+.env
+
+.idea
+.vscode
+
+tests
