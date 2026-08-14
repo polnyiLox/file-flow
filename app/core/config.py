@@ -23,9 +23,17 @@ class ApiSettings(BaseModel):
     reload: bool
 
 
+class MIddlewareSettings(BaseModel):
+    allow_origins: list[str]
+    allow_methods: list[str]
+    allow_headers: list[str]
+    allow_credentials: bool
+
+
 class Settings(BaseSettings):
     db: DataBaseSettings
     api: ApiSettings
+    middleware: MIddlewareSettings
 
     model_config = SettingsConfigDict(
         env_file=".env",
