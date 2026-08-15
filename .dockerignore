@@ -1,15 +1,26 @@
-.venv
-__pycache__
-.pytest_cache
-.mypy_cache
-.coverage
-
 .git
 .gitignore
 
 .env
+.env.*
+!.env.example
+
+.venv
+__pycache__
+*.py[cod]
+
+.pytest_cache
+.mypy_cache
+.ruff_cache
+.coverage
+htmlcov
 
 .idea
 .vscode
 
 tests
+
+*.log
+
+Dockerfile.dev
+docker-compose.dev.yaml
