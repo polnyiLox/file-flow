@@ -1,59 +1,56 @@
 # ============================================================
-# BUILDER
+# Builder
 # ============================================================
 
 FROM python:3.14-slim AS builder
 
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1
+
 WORKDIR /app
 
-# Устанавливаем uv
-COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
+# Устанавливаем uv только на этапе сборки
+COPY --from=ghcr.io/astral-sh/uv:0.10.0 /uv /uvx /bin/
 
-# Сначала копируем только файлы зависимостей
+# Сначала зависимости — Docker сможет кэшировать этот слой
 COPY pyproject.toml uv.lock ./
 
-# Устанавливаем production-зависимости
-# непосредственно в системный Python.
-RUN uv sync --frozen --no-dev --system
+# Создаём /app/.venv и устанавливаем production dependencies
+RUN uv sync --frozen --no-dev
 
 # Теперь копируем исходный код
-COPY . .
+COPY app ./app
+COPY alembic ./alembic
+COPY alembic.ini ./
 
 
 # ============================================================
-# RUNTIME
+# Runtime
 # ============================================================
 
 FROM python:3.14-slim AS runtime
 
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PYTHONPATH=/app \
+    PATH="/app/.venv/bin:$PATH"
+
 WORKDIR /app
 
-# Переносим установленные Python-пакеты
-# из builder в runtime.
-COPY --from=builder /usr/local/lib/python3.13/site-packages \
-                    /usr/local/lib/python3.13/site-packages
+# Непривилегированный пользователь
+RUN useradd \
+    --create-home \
+    --uid 10001 \
+    --shell /usr/sbin/nologin \
+    appuser
 
-# Переносим исполняемые файлы,
-# установленные вместе с пакетами.
-COPY --from=builder /usr/local/bin \
-                    /usr/local/bin
-
-# Переносим приложение
-COPY --from=builder /app/app /app/app
-
-# Если используешь Alembic:
-COPY --from=builder /app/alembic /app/alembic
-COPY --from=builder /app/alembic.ini /app/alembic.ini
-
-# Если приложение использует templates/static:
-# COPY --from=builder /app/templates /app/templates
-# COPY --from=builder /app/static /app/static
-
-# Создаем непривилегированного пользователя
-RUN useradd --create-home appuser
+# Забираем только готовое приложение и venv
+COPY --from=builder --chown=appuser:appuser /app /app
 
 USER appuser
 
 EXPOSE 8000
 
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port","8000"]
+# Только API.
+# Миграции запускаются отдельным service в Compose.
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
