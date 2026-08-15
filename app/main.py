@@ -3,10 +3,13 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app.core.config import settings
+from app.core.health import router as health_router
 from app.exceptions import AppError
 
 
 app = FastAPI()
+
+app.include_router(health_router)
 
 app.add_middleware(
     CORSMiddleware,
