@@ -7,6 +7,7 @@ from fastapi.responses import JSONResponse
 
 from app.api.routers import v1_router
 from app.core.config import settings
+from app.core.health import router as health_router
 from app.db import mongodb_client
 from app.exceptions import AppError
 
@@ -23,6 +24,7 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
 app = FastAPI(lifespan=lifespan)
 
 app.include_router(v1_router)
+app.include_router(health_router)
 
 app.add_middleware(
     CORSMiddleware,
