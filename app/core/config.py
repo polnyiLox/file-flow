@@ -30,10 +30,17 @@ class MIddlewareSettings(BaseModel):
     allow_credentials: bool
 
 
+class KafkaSettings(BaseModel):
+    bootstrap_servers: list[str]
+    client_id: str
+    acks: str = "all"
+
+
 class Settings(BaseSettings):
     db: DataBaseSettings
     api: ApiSettings
     middleware: MIddlewareSettings
+    kafka: KafkaSettings
 
     model_config = SettingsConfigDict(
         env_file=".env",
