@@ -17,7 +17,8 @@ class FileORM(Base):
 
     original_key: Mapped[str]
     thumbnail_key: Mapped[str] = mapped_column(
-        nullable=True
+        nullable=True,
+        default=None
     )
 
     status: Mapped[FileStatuses] = mapped_column(

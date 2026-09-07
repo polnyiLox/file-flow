@@ -2,7 +2,6 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models.file import FileORM
-from app.enums import FileStatuses
 
 
 class FileRepository:
@@ -15,23 +14,20 @@ class FileRepository:
             content_type: str,
             size: int,
             original_key: str,
-            thumbnail_key: str,
-            status: FileStatuses
     ) -> FileORM:
         file_orm = FileORM(
             original_name=original_name,
             content_type=content_type,
             size=size,
             original_key=original_key,
-            thumbnail_key=thumbnail_key,
-            status=status
         )
         self._session.add(file_orm)
         await self._session.flush()
         return file_orm
 
-    async def get_all(self) -> list[FileORM]:
-        query = select(FileORM).order_by(FileORM.created_at.desc())
+    async def get_all(self, limit: int, offset: int) -> list[FileORM]:
+        query = (select(FileORM).order_by(FileORM.created_at.desc())
+                 .limit(limit).offset(offset))
         res = await self._session.execute(query)
         return list(res.scalars().all())
 
