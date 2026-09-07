@@ -5,6 +5,7 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.14"
 dependencies = [
+    "aio-pika>=10.0.1",
     "aiobotocore>=3.9.0",
     "aiokafka>=0.14.0",
     "alembic>=1.19.1",
@@ -12,6 +13,7 @@ dependencies = [
     "fastapi>=0.141.1",
     "httpx>=0.28.1",
     "pydantic-settings>=2.15.0",
+    "redis>=8.1.0",
     "sqlalchemy>=2.0.52",
     "uvicorn>=0.52.3",
 ]
