@@ -21,7 +21,7 @@ def wait_for(check, timeout=90):
 
 def main():
     created = []
-    with httpx.Client(base_url=BASE_URL, timeout=15) as client:
+    with httpx.Client(base_url=BASE_URL, timeout=15, trust_env=False) as client:
         def get_json(path):
             response = client.get(path)
             response.raise_for_status()
