@@ -101,7 +101,7 @@ async def engine(
 # Database session
 # ============================================================
 
-@pytest_asyncio.fixture
+@pytest_asyncio.fixture(loop_scope="session")
 async def session(
     engine: AsyncEngine,
 ) -> AsyncGenerator[AsyncSession, None]:
