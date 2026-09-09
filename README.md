@@ -1,152 +1,51 @@
-# Start App Mongo
+# Analytics Service
 
-Переиспользуемый шаблон асинхронного приложения на FastAPI и MongoDB.
+Kafka consumer слушает file.events и сохраняет события в MongoDB,
+коллекция analytics_events. Router → AnalyticsService → AnalyticsRepository.
 
-## Что уже настроено
+Уникальный индекс event_id делает обработку повторных сообщений идемпотентной.
+Offset подтверждается вручную после insert. Если insert или commit не удался,
+текущее сообщение повторяется. Некорректные события логируются и пропускаются.
 
-- FastAPI и Uvicorn;
-- асинхронный официальный драйвер `pymongo.AsyncMongoClient`;
-- конфигурация через Pydantic Settings и `.env`;
-- подключение и корректное закрытие MongoDB через lifespan FastAPI;
-- проверка соединения с MongoDB при запуске приложения;
-- CORS middleware;
-- базовый обработчик ошибок;
-- версионирование API через `/v1`;
-- endpoint `GET /health`;
-- слои `api`, `services`, `repositories`, `schemas` и `enums`;
-- production и development Docker Compose;
-- основа для интеграционных тестов с MongoDB Testcontainer;
-- управление зависимостями через `uv`.
+## Запуск
 
-Motor намеренно не используется. Для новых асинхронных приложений MongoDB рекомендует Async API официального драйвера PyMongo.
+Из родительской папки: `docker compose up -d --build`.
 
-## Требования
+Для отдельного запуска скопируйте `.env.example` в `.env` и настройте MongoDB и Kafka:
 
-- Python 3.14;
-- uv;
-- Docker и Docker Compose для контейнерного запуска.
-
-## Подготовка
-
-Скопируй файл с примером настроек:
-
-```powershell
-Copy-Item .env.example .env
+```shell
+uv sync --frozen
+uv run uvicorn app.main:app --host 0.0.0.0 --port 8003
 ```
 
-Установи зависимости:
+Настройки APP_CONFIG__MONGODB__*, APP_CONFIG__KAFKA__*.
+По умолчанию группа Kafka analytics-service, auto_offset_reset=earliest.
+Индексы создаются при запуске.
 
-```powershell
-uv sync
+## API
+
+| Путь | Ответ |
+| --- | --- |
+| GET /v1/analytics/overview | files_uploaded, files_processed, files_failed, average_processing_ms |
+| GET /v1/analytics/uploads | список file.uploaded |
+| GET /v1/analytics/processing | список started/processed/failed |
+| GET /health | 503, если фоновый consumer завершился |
+| GET /metrics | Prometheus |
+
+Списки принимают page (от 1), page_size (1–100), сортируются от новых к старым.
+Overview использует MongoDB aggregation. Среднее считается только по file.processed
+с числовым processing_time_ms. При отсутствии данных возвращается 0.
+Счётчики исторические: удаление файла не уменьшает число загрузок.
+
+Внешний префикс gateway: /api/v1/analytics.
+События сохраняются асинхронно; сразу после загрузки статистика может ещё не обновиться.
+
+## Проверки
+
+```shell
+uv run pytest tests/test_analytics.py -q
+uv run pytest tests/integration -q
 ```
 
-Значения по умолчанию в `.env.example` предназначены для Docker Compose. Для запуска API напрямую на компьютере измени:
-
-```env
-APP_CONFIG__MONGODB__HOST=localhost
-```
-
-## Запуск для разработки
-
-Полностью в Docker:
-
-```powershell
-docker compose -f docker-compose.dev.yaml up --build
-```
-
-Или MongoDB в Docker, а API локально:
-
-```powershell
-docker compose -f docker-compose.dev.yaml up mongodb
-uv run uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
-```
-
-После запуска доступны:
-
-- API: `http://localhost:8000`;
-- Swagger UI: `http://localhost:8000/docs`;
-- ReDoc: `http://localhost:8000/redoc`;
-- health check: `http://localhost:8000/health`.
-
-## Production-запуск
-
-```powershell
-docker compose up --build -d
-```
-
-Production-образ запускает приложение от непривилегированного пользователя и устанавливает только основные зависимости.
-
-## Структура
-
-```text
-start_app_mongo/
-├── app/
-│   ├── api/
-│   │   ├── dependencies.py
-│   │   └── routers/
-│   │       └── v1/
-│   ├── core/
-│   │   ├── config.py
-│   │   └── health.py
-│   ├── db/
-│   │   └── mongodb.py
-│   ├── enums/
-│   ├── exceptions/
-│   ├── repositories/
-│   ├── schemas/
-│   ├── services/
-│   └── main.py
-├── tests/
-│   └── conftest.py
-├── .env.example
-├── Dockerfile
-├── Dockerfile.dev
-├── docker-compose.yaml
-├── docker-compose.dev.yaml
-├── pyproject.toml
-└── uv.lock
-```
-
-## Как добавлять функционал
-
-Рекомендуемый поток для новой сущности:
-
-1. Pydantic-схемы разместить в `app/schemas`.
-2. Запросы к MongoDB разместить в `app/repositories`.
-3. Бизнес-логику разместить в `app/services`.
-4. HTTP-ручки разместить в `app/api/routers/v1`.
-5. Подключить новый router в `app/api/routers/v1/__init__.py`.
-
-Базу можно получить через FastAPI dependency:
-
-```python
-from typing import Annotated
-
-from fastapi import Depends
-from pymongo.asynchronous.database import AsyncDatabase
-
-from app.api.dependencies import get_database
-
-
-Database = Annotated[AsyncDatabase, Depends(get_database)]
-```
-
-В репозитории коллекция выбирается так:
-
-```python
-class ExampleRepository:
-    def __init__(self, database: AsyncDatabase) -> None:
-        self.collection = database["examples"]
-```
-
-MongoDB не требует Alembic. Индексы и правила валидации коллекций следует создавать отдельно при появлении конкретных моделей проекта.
-
-## Тесты
-
-В шаблоне пока нет тестовых сценариев, но подготовлен `tests/conftest.py`. Он запускает временную MongoDB через Testcontainers и предоставляет fixture `database`:
-
-```powershell
-uv run pytest
-```
-
-Для интеграционных тестов должен быть запущен Docker.
+Второй запуск требует Docker и проверяет настоящую MongoDB: индекс, дубликаты,
+агрегацию. Сквозной тест описан в корневом README.
