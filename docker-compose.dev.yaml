@@ -1,0 +1,17 @@
+services:
+  file-service:
+    volumes:
+      - ./file-service/app:/app/app
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+  processor-service:
+    volumes:
+      - ./process-service/app:/app/app
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+  analytics-service:
+    volumes:
+      - ./analytics-service/app:/app/app
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+  api-gateway:
+    volumes:
+      - ./api-gateway/app:/app/app
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
