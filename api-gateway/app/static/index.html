@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="FileFlow — загрузка изображений, создание превью и хранение оригиналов.">
+  <title>FileFlow — ваши изображения</title>
+  <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/static/style.css">
+  <script src="/static/app.js" defer></script>
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="/" aria-label="FileFlow, главная"><img src="/static/favicon.svg" alt="" width="36" height="36">File<span>Flow</span></a>
+    <span class="workspace">Рабочее пространство</span>
+    <a class="api-link" href="/docs" target="_blank" rel="noopener">API <span aria-hidden="true">↗</span></a>
+  </header>
+  <main>
+    <section class="intro" aria-labelledby="page-title">
+      <div><p class="eyebrow">ВАША МЕДИАТЕКА</p><h1 id="page-title">Меньше размер.<br>Больше возможностей.</h1><p class="description">Загрузите изображение — мы сохраним оригинал<br class="desktop-break"> и подготовим компактное превью.</p></div>
+      <dl class="stats" aria-label="Статистика за всё время">
+        <div><dt>Загружено</dt><dd id="uploaded-count">—</dd></div>
+        <div><dt>Обработано</dt><dd id="processed-count">—</dd></div>
+        <div><dt>С ошибкой</dt><dd id="failed-count">—</dd></div>
+      </dl>
+    </section>
+    <section id="drop-zone" class="drop-zone" aria-labelledby="upload-title">
+      <div class="upload-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 16V4m-4 4 4-4 4 4M4 15v4a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-4"/></svg></div>
+      <h2 id="upload-title">Перетащите изображение сюда</h2>
+      <p>или выберите файл на компьютере</p>
+      <button id="choose-file" class="button primary" type="button">Выбрать изображение <span aria-hidden="true">＋</span></button>
+      <input id="file-input" type="file" accept="image/png,image/jpeg" hidden>
+      <span class="file-hint">PNG, JPG · до 10 МБ · превью до 400 × 400</span>
+    </section>
+    <p id="notice" class="notice" role="status" aria-live="polite" hidden></p>
+    <section class="library" aria-labelledby="library-title">
+      <div class="section-heading"><div><h2 id="library-title">Ваши изображения</h2><p>Оригиналы и готовые превью в одном месте</p></div><button id="refresh" class="button secondary" type="button"><span aria-hidden="true">↻</span> Обновить</button></div>
+      <div id="files" class="files" aria-busy="true"><div class="empty">Загружаем ваши изображения…</div></div>
+      <div class="pagination"><button id="previous" class="button secondary" type="button" disabled>← Назад</button><span id="page-label">Страница 1</span><button id="next" class="button secondary" type="button" disabled>Далее →</button></div>
+    </section>
+    <footer><span>FileFlow <span class="footer-dot">·</span> Просто работа с изображениями</span><span>Оригиналы сохраняются без изменений</span></footer>
+  </main>
+  <dialog id="delete-dialog" aria-labelledby="delete-title">
+    <h2 id="delete-title">Удалить изображение?</h2><p>Оригинал и превью будут удалены. Отменить это действие не получится.</p>
+    <form method="dialog"><button class="button secondary" value="cancel">Оставить</button><button class="button danger" value="delete">Удалить</button></form>
+  </dialog>
+</body>
+</html>
