@@ -1,6 +1,9 @@
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI, Request
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 
 from app.core.config import settings
 from app.core.service_client import ServiceClient
@@ -43,3 +46,12 @@ async def analytics(request: Request, report: str):
     if report not in {"overview", "uploads", "processing"}:
         raise HTTPException(404, "Unknown report")
     return await request.app.state.analytics.forward(request, f"/v1/analytics/{report}")
+
+
+static_directory = Path(__file__).parent / "static"
+app.mount("/static", StaticFiles(directory=static_directory), name="static")
+
+
+@app.get("/", include_in_schema=False)
+async def frontend() -> FileResponse:
+    return FileResponse(static_directory / "index.html")
