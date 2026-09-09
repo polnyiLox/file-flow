@@ -1,17 +1,4 @@
-from .kafka import KafkaProducer, KafkaClient
-from .rabbitmq import (
-    RabbitMQClient,
-    RabbitMQExchanges,
-    RabbitMQProducer,
-    RabbitMQQueues
-)
+from .kafka import KafkaClient, KafkaProducer
+from .rabbitmq import RabbitMQClient, RabbitMQProducer
 
-
-__all__ = [
-    "KafkaProducer",
-    "KafkaClient",
-    "RabbitMQClient",
-    "RabbitMQExchanges",
-    "RabbitMQProducer",
-    "RabbitMQQueues",
-]
+__all__ = ["KafkaClient", "KafkaProducer", "RabbitMQClient", "RabbitMQProducer"]

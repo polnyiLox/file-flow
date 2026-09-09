@@ -20,7 +20,9 @@ class RabbitMQProducer:
 
         await exchange.publish(
             message=aio_pika.Message(
-                body=event.model_dump_json().encode()
+                body=event.model_dump_json().encode(),
+                message_id=event.command_id,
+                delivery_mode=aio_pika.DeliveryMode.PERSISTENT,
             ),
             routing_key=self._routing_keys_settings.process_file_routing_keys
         )

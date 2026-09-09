@@ -19,7 +19,8 @@ class RabbitMQQueues:
             process_commands_exchange: AbstractRobustExchange
     ) -> AbstractRobustQueue:
         queue = await self._channel.declare_queue(
-            name=self._queue_settings.process_file_queue
+            name=self._queue_settings.process_file_queue,
+            durable=True,
         )
 
         await queue.bind(

@@ -54,7 +54,7 @@ class KafkaConsumer:
                         )
                         await self._file_service.update_file_status(
                             file_id=event.payload.file_id,
-                            new_status=FileStatuses.PROCESSED,
+                            new_status=FileStatuses.READY,
                         )
                     else:
                         await self._file_service.handle_process_completed(
