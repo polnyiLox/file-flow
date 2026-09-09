@@ -1,7 +1,7 @@
 [project]
-name = "start-app"
+name = "file-service"
 version = "0.1.0"
-description = "Add your description here"
+description = "FileFlow image processing project"
 readme = "README.md"
 requires-python = ">=3.14"
 dependencies = [
@@ -12,7 +12,9 @@ dependencies = [
     "asyncpg>=0.31.0",
     "fastapi>=0.141.1",
     "httpx>=0.28.1",
+    "prometheus-client>=0.26.0",
     "pydantic-settings>=2.15.0",
+    "python-multipart>=0.0.32",
     "redis>=8.1.0",
     "sqlalchemy>=2.0.52",
     "uvicorn>=0.52.3",
