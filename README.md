@@ -54,8 +54,8 @@ curl.exe -X DELETE http://localhost:8000/api/v1/files/FILE_ID
 - [Analytics Service](analytics-service/README.md): Kafka consumer, MongoDB, три отчёта.
 - [API Gateway](api-gateway/README.md): HTTP proxy на httpx.
 
-Исходные сервисы находятся в отдельных Git-репозиториях. Общая инфраструктура
-и тест полного сценария находятся в корневой папке. Имя папки обработчика
+Сервисы и общая инфраструктура находятся в одном репозитории. Истории исходных
+репозиториев сохранены при объединении. Тест полного сценария находится в корневой папке. Имя папки обработчика
 `process-service` сохранено; в Compose он называется `processor-service`.
 
 ## Разработка и тесты
