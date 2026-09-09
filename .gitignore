@@ -1,0 +1,9 @@
+/file-service/
+/process-service/
+/analytics-service/
+/api-gateway/
+.env
+.venv/
+__pycache__/
+.pytest_cache/
+*.pyc
