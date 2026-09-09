@@ -61,6 +61,7 @@ def apply_migrations(database_url: str) -> None:
     """
 
     config = Config("alembic.ini")
+    config.attributes["test_database"] = True
 
     config.set_main_option(
         "sqlalchemy.url",
