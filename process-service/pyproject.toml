@@ -1,0 +1,24 @@
+[project]
+name = "process-service"
+version = "0.1.0"
+description = "FileFlow image processing project"
+readme = "README.md"
+requires-python = ">=3.14"
+dependencies = [
+    "aio-pika>=10.0.1",
+    "aiobotocore>=3.9.0",
+    "aiokafka>=0.14.0",
+    "fastapi>=0.141.1",
+    "httpx>=0.28.1",
+    "pillow>=12.3.0",
+    "prometheus-client>=0.26.0",
+    "pydantic-settings>=2.15.0",
+    "uvicorn>=0.52.3",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+    "pytest-asyncio>=1.4.0",
+    "testcontainers>=4.15.0",
+]
