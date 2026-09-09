@@ -1,6 +1,3 @@
-from fastapi import APIRouter
+from .analytics import router
 
-from app.core.config import settings
-
-
-router = APIRouter(prefix=settings.api.v1_prefix)
+__all__ = ["router"]
