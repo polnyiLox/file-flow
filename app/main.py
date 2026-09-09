@@ -1,30 +1,39 @@
-from fastapi import FastAPI, Request
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from contextlib import asynccontextmanager
 
+from fastapi import FastAPI
+
+from app.broker.kafka import KafkaProducer
+from app.broker.rabbitmq import RabbitMQConsumer
 from app.core.config import settings
-from app.core.health import router as health_router
-from app.exceptions import AppError
+from app.core.file_client import FileClient
+from app.core.s3_client import S3Client
+from app.core.logging import configure_logging
+from app.core.metrics import setup_metrics
+from app.services.process import ProcessService
+
+configure_logging()
 
 
-app = FastAPI()
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    file_client = FileClient(settings.file_service_url)
+    kafka_producer = KafkaProducer(settings.kafka)
+    service = ProcessService(S3Client(settings.s3), file_client, kafka_producer, settings.thumbnail_size)
+    consumer = RabbitMQConsumer(settings.rabbitmq, service)
+    try:
+        await kafka_producer.connect()
+        await consumer.connect()
+        yield
+    finally:
+        await consumer.close()
+        await kafka_producer.close()
+        await file_client.close()
 
-app.include_router(health_router)
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=settings.middleware.allow_origins,
-    allow_methods=settings.middleware.allow_methods,
-    allow_headers=settings.middleware.allow_headers,
-    allow_credentials=settings.middleware.allow_credentials
-)
+app = FastAPI(title="Processor Service", lifespan=lifespan)
+setup_metrics(app)
 
 
-@app.exception_handler(AppError)
-async def app_errors_handler(request: Request, exc: AppError) -> JSONResponse:
-    return JSONResponse(
-        status_code=exc.status_code,
-        content={
-            "detail": exc.detail
-        }
-    )
+@app.get("/health")
+async def health() -> dict:
+    return {"status": "ok"}
