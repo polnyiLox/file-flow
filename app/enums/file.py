@@ -2,7 +2,7 @@ from enum import StrEnum
 
 
 class FileStatuses(StrEnum):
-    UPLOADED = "uploaded"
-    PROCESSING = "processing"
-    PROCESSED = "processed"
-    FAILED = "failed"
+    UPLOADED = "UPLOADED"
+    PROCESSING = "PROCESSING"
+    READY = "READY"
+    FAILED = "FAILED"

@@ -16,7 +16,7 @@ class FileORM(Base):
     size: Mapped[int]
 
     original_key: Mapped[str]
-    thumbnail_key: Mapped[str] = mapped_column(
+    thumbnail_key: Mapped[str | None] = mapped_column(
         nullable=True,
         default=None
     )

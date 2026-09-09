@@ -14,8 +14,10 @@ class FileRepository:
             content_type: str,
             size: int,
             original_key: str,
+            file_id: str,
     ) -> FileORM:
         file_orm = FileORM(
+            id=file_id,
             original_name=original_name,
             content_type=content_type,
             size=size,
