@@ -1,5 +1,6 @@
 from contextlib import asynccontextmanager
 from collections.abc import AsyncGenerator
+from urllib.parse import quote
 
 from aiobotocore.session import get_session
 from botocore.config import Config
@@ -49,11 +50,14 @@ class S3Client:
                 while chunk := await body.read(65536):
                     yield chunk
 
-    async def create_presigned_url(self, key: str) -> str:
+    async def create_presigned_url(self, key: str, download_name: str | None = None) -> str:
         config = {**self._config, "endpoint_url": self._public_endpoint_url}
+        params = {"Bucket": self._bucket_name, "Key": key}
+        if download_name:
+            params["ResponseContentDisposition"] = "attachment; filename*=UTF-8''" + quote(download_name, safe="")
         async with self._session.create_client("s3", **config) as client:
             return await client.generate_presigned_url(
-                "get_object", Params={"Bucket": self._bucket_name, "Key": key},
+                "get_object", Params=params,
                 ExpiresIn=self._presigned_url_ttl_seconds,
             )
 

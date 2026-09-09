@@ -151,11 +151,16 @@ class FileService:
             logger.warning("Redis not connected")
         return file
 
-    async def download_file(self, file_id: str) -> DownloadFileSchema:
+    async def download_file(self, file_id: str, attachment: bool = False) -> DownloadFileSchema:
         file = await self._get_existing_file_by_id(file_id)
         return DownloadFileSchema(
-            original_url=await self._s3_client.create_presigned_url(file.original_key),
-            thumbnail_url=await self._s3_client.create_presigned_url(file.thumbnail_key)
+            original_url=await self._s3_client.create_presigned_url(
+                file.original_key, download_name=file.original_name if attachment else None,
+            ),
+            thumbnail_url=await self._s3_client.create_presigned_url(
+                file.thumbnail_key,
+                download_name=f"{PurePath(file.original_name).stem}-thumbnail.jpg" if attachment else None,
+            )
             if file.thumbnail_key else None,
         )
 

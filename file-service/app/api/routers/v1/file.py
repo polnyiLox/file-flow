@@ -56,6 +56,7 @@ async def delete_file(
 @router.get("/{file_id}/download", response_model=DownloadFileSchema)
 async def download_file(
         file_id: str,
+        attachment: bool = False,
         file_service: FileService = Depends(get_file_service)
 ) -> DownloadFileSchema:
-    return await file_service.download_file(file_id)
+    return await file_service.download_file(file_id, attachment=attachment)
