@@ -4,11 +4,18 @@
 - Processor Service: 6 unit-тестов прошли.
 - Analytics Service: 5 unit-тестов прошли.
 - API Gateway: 6 unit-тестов прошли.
-- Production и development Docker Compose: config --quiet прошёл.
-- Alembic upgrade head --sql: миграция PostgreSQL успешно генерируется.
-- Интеграционные тесты PostgreSQL и MongoDB успешно собираются (collect-only).
+- Интеграционный тест PostgreSQL: прошёл на реальном временном контейнере.
+- Интеграционный тест MongoDB: прошёл на реальном временном контейнере.
+- Production и development Docker Compose: конфигурация валидна.
+- Production Docker-образы четырёх приложений собраны.
+- Миграция Alembic применена при запуске Compose.
+- tests/e2e.py: прошёл полный цикл загрузки, обработки, скачивания, аналитики и удаления.
+- Повреждённое изображение получает FAILED; событие доходит до MongoDB.
+- tests/observability.py: health gateway, четыре Prometheus targets, Grafana dashboard
+  и наличие логов Processor в Loki проверены успешно.
 
-Docker Engine недоступен: отсутствует pipe dockerDesktopLinuxEngine.
-Поэтому сборка контейнеров, интеграционные тесты и tests/e2e.py не выполнены.
-После запуска Docker Desktop: docker compose up -d --build, затем команды тестов
-из README.md. Эти проверки нельзя считать прошедшими до реального запуска.
+Приложение запущено локально через docker compose up -d --build.
+Миграционный контейнер завершился с кодом 0; остальные 14 контейнеров работают.
+
+Тесты localhost используют trust_env=False, чтобы системный HTTP proxy
+не перехватывал локальные запросы.

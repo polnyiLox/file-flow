@@ -78,11 +78,13 @@ uv run pytest tests --ignore=tests/integration -q
 
 ```shell
 uv run --directory process-service python ../tests/e2e.py
+uv run --directory process-service python ../tests/observability.py
 ```
 
 Он загружает PNG, ждёт READY, скачивает оригинал и JPEG-превью, проверяет Kafka →
 MongoDB через Analytics API, обрабатывает повреждённое изображение и удаляет
 созданные файлы. Тест проверяет и повторное чтение метаданных через кэш.
+Второй скрипт проверяет Prometheus, Grafana и поступление логов в Loki.
 
 Для интеграционных тестов PostgreSQL и MongoDB из папки соответствующего сервиса:
 
