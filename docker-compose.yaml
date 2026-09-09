@@ -74,7 +74,7 @@ services:
       start_period: 20s
 
   minio:
-    image: minio/minio:RELEASE.2025-04-22T22-12-26Z
+    image: minio/minio:RELEASE.2025-09-07T16-13-09Z
     command: server /data --console-address ":9001"
     environment:
       MINIO_ROOT_USER: minioadmin
@@ -177,7 +177,7 @@ services:
         condition: service_healthy
 
   prometheus:
-    image: prom/prometheus:v3.5.0
+    image: prom/prometheus:v3.1.0
     volumes:
       - ./infrastructure/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - prometheus_data:/prometheus
@@ -185,14 +185,14 @@ services:
       - "127.0.0.1:9090:9090"
 
   loki:
-    image: grafana/loki:3.5.3
+    image: grafana/loki:3.3.2
     command: -config.file=/etc/loki/local-config.yaml
     volumes:
       - ./infrastructure/loki/config.yaml:/etc/loki/local-config.yaml:ro
       - loki_data:/loki
 
   alloy:
-    image: grafana/alloy:v1.10.2
+    image: grafana/alloy:v1.5.1
     command: run --storage.path=/var/lib/alloy/data /etc/alloy/config.alloy
     volumes:
       - ./infrastructure/alloy/config.alloy:/etc/alloy/config.alloy:ro
@@ -202,7 +202,7 @@ services:
       - loki
 
   grafana:
-    image: grafana/grafana:12.1.0
+    image: grafana/grafana:11.5.1
     environment:
       GF_SECURITY_ADMIN_USER: admin
       GF_SECURITY_ADMIN_PASSWORD: admin
