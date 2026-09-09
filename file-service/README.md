@@ -47,6 +47,8 @@ S3 ENDPOINT_URL нужен для связи сервиса с MinIO, PUBLIC_END
 PNG/JPEG получает FAILED. Ссылка на превью равна null до готовности.
 
 S3-ключи: files/{id}/original.png (или jpg/jpeg), files/{id}/thumbnail.jpg.
+Параметр attachment=true у /download добавляет к подписанным ссылкам заголовок
+Content-Disposition, чтобы браузер скачивал файлы с исходными именами.
 При изменении статуса и удалении кэш инвалидируется после commit.
 Повторный callback processing не сбрасывает READY.
 

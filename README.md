@@ -21,6 +21,7 @@ Compose применяет миграцию PostgreSQL, File Service созда�
 
 | Адрес | Назначение | Учебный логин |
 | --- | --- | --- |
+| http://localhost:8000 | Интерфейс FileFlow | — |
 | http://localhost:8000/docs | API Gateway | — |
 | http://localhost:9001 | MinIO Console | minioadmin / minioadmin |
 | http://localhost:15672 | RabbitMQ | file / file |
@@ -31,6 +32,14 @@ Compose применяет миграцию PostgreSQL, File Service созда�
 Это локальный учебный запуск без авторизации, не конфигурация для публичного сервера.
 
 ## Пример
+
+Откройте http://localhost:8000: перетащите PNG/JPEG или нажмите «Выбрать изображение».
+Список автоматически обновляется каждые 4 секунды. После обработки появится превью;
+кнопки «Оригинал» и «Превью» скачивают файлы. Удаление требует подтверждения.
+Счётчики сверху показывают статистику за всё время, включая удалённые файлы.
+
+Фронтенд — HTML, CSS и обычный JavaScript в api-gateway/app/static.
+Сборщик и Node.js для запуска не нужны; статику отдаёт FastAPI gateway.
 
 В PowerShell используйте `curl.exe`, в Linux — `curl`.
 
@@ -52,7 +61,7 @@ curl.exe -X DELETE http://localhost:8000/api/v1/files/FILE_ID
 - [File Service](file-service/README.md): API, PostgreSQL, MinIO, Redis, RabbitMQ publisher.
 - [Processor Service](process-service/README.md): RabbitMQ consumer, Pillow, HTTP callback, Kafka producer.
 - [Analytics Service](analytics-service/README.md): Kafka consumer, MongoDB, три отчёта.
-- [API Gateway](api-gateway/README.md): HTTP proxy на httpx.
+- [API Gateway](api-gateway/README.md): HTTP proxy на httpx и простой фронтенд.
 
 Сервисы и общая инфраструктура находятся в одном репозитории. Истории исходных
 репозиториев сохранены при объединении. Тест полного сценария находится в корневой папке. Имя папки обработчика

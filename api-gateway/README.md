@@ -2,6 +2,11 @@
 
 Простой FastAPI proxy на httpx.AsyncClient.
 
+На / расположен фронтенд FileFlow: загрузка PNG/JPEG, список файлов с превью,
+статусы обработки, скачивание оригинала/превью и удаление с подтверждением.
+Исходники — app/static/index.html, style.css и app.js. Никаких frontend-зависимостей
+или отдельной сборки нет. API-запросы идут на тот же адрес, поэтому CORS не нужен.
+
 - /api/v1/files → File Service /v1/files.
 - /api/v1/files/{path} → файловые GET/DELETE.
 - /api/v1/analytics/overview, uploads, processing → Analytics Service.
@@ -30,4 +35,4 @@ APP_CONFIG__FILE_SERVICE_URL и APP_CONFIG__ANALYTICS_SERVICE_URL задают u
 APP_CONFIG__TIMEOUT_SECONDS — таймаут (30 секунд).
 APP_CONFIG__MAX_BODY_SIZE — лимит в байтах (11534336).
 
-Авторизации и пользовательского интерфейса нет по ТЗ.
+Авторизации нет по ТЗ.
