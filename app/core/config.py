@@ -1,6 +1,4 @@
 from functools import lru_cache
-import logging
-import sys
 
 from pydantic import BaseModel
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -53,22 +51,23 @@ class RabbitMQConnectionSettings(BaseModel):
 
 
 class RabbitMQExchangesSettings(BaseModel):
-    process_service_commands_name: str = "process.commands"
+    process_service_commands_name: str = "image.commands"
     process_service_commands_type: str = "topic"
 
 
 class RabbitMQQueueSettings(BaseModel):
-    process_file_queue = "process.file.queue"
+    process_file_queue: str = "image.process"
 
 
 class RabbitMQRoutingKeysSettings(BaseModel):
-    process_file_routing_keys = "file.process"
+    process_file_routing_keys: str = "image.process"
 
 
 class S3Settings(BaseModel):
     access_key: str
     secret_key: str
     endpoint_url: str
+    public_endpoint_url: str = "http://localhost:9000"
     bucket_name: str
     presigned_url_ttl_seconds: int = 3600
 
@@ -76,7 +75,6 @@ class S3Settings(BaseModel):
 class LoggingSettings(BaseModel):
     level: str = "INFO"
     format: str = "%(asctime)s | %(levelname)s | %(name)s | %(message)s"
-    handlers: list = [logging.StreamHandler(sys.stdout)]
 
 
 class RedisSettings(BaseModel):
@@ -85,7 +83,7 @@ class RedisSettings(BaseModel):
     host: str = "localhost"
     port: int = 6379
     db: int = 1
-    ttl_seconds: int = 3600
+    ttl_seconds: int = 300
 
     @property
     def url(self) -> str:
