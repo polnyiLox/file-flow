@@ -35,6 +35,8 @@ def main():
             return None
 
         try:
+            for path in ["/", "/static/app.js", "/static/style.css", "/static/favicon.svg"]:
+                assert client.get(path).status_code == 200, path
             output = BytesIO()
             Image.new("RGB", (900, 300), "green").save(output, "PNG")
             original = output.getvalue()
@@ -48,6 +50,12 @@ def main():
             downloaded = client.get(urls["original_url"])
             downloaded.raise_for_status()
             assert downloaded.content == original
+            attachments = get_json(f"/api/v1/files/{file_id}/download?attachment=true")
+            attachment = client.get(attachments["original_url"])
+            attachment.raise_for_status()
+            assert attachment.content == original
+            assert attachment.headers["content-disposition"].startswith("attachment;")
+            assert "sample.png" in attachment.headers["content-disposition"]
             thumbnail_response = client.get(urls["thumbnail_url"])
             thumbnail_response.raise_for_status()
             with Image.open(BytesIO(thumbnail_response.content)) as thumbnail:
