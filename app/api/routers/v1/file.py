@@ -31,7 +31,7 @@ async def upload_file(
 @router.get("", response_model=list[FileReadSchema])
 async def get_files_history(
         page: int = Query(1, ge=1, description="Page number"),
-        page_size: int = Query(10, ge=1, description="Page size"),
+        page_size: int = Query(10, ge=1, le=100, description="Page size"),
         file_service: FileService = Depends(get_file_service),
 ) -> list[FileReadSchema]:
     return await file_service.get_files_history(page, page_size)

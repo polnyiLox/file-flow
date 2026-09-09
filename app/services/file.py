@@ -2,428 +2,173 @@ import logging
 from pathlib import PurePath
 from uuid import uuid4
 
-from fastapi import UploadFile
+from fastapi import HTTPException, UploadFile
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.broker import RabbitMQProducer, KafkaProducer
+from app.broker import KafkaProducer, RabbitMQProducer
 from app.cache import Cache
 from app.core.s3_client import S3Client
 from app.db.models import FileORM
-from app.enums import (
-    FileStatuses,
-    FileEventsContentTypesEnum
-)
+from app.enums import FileStatuses, FileEventsContentTypesEnum
 from app.exceptions import (
-    ForbiddenFileExtensionError,
-    FilenameMissedError,
-    InvalidFilenameError,
-    InvalidFileFormatError,
-    FileORMNotFoundError,
-    RedisNotConnectedError,
-    S3ServiceError,
-    RabbitMQServiceError
+    FilenameMissedError, InvalidFilenameError, ForbiddenFileExtensionError,
+    InvalidFileFormatError, FileORMNotFoundError, RedisNotConnectedError, S3ServiceError,
 )
 from app.repositories import FileRepository
 from app.schemas import (
-    FileReadSchema,
-    DownloadFileSchema,
-    ProcessCommandEvent,
-    FileEventMessage,
-    FileEventMessagePayload
+    FileReadSchema, DownloadFileSchema, ProcessCommandEvent,
+    FileEventMessage, FileEventMessagePayload,
 )
-
+from app.core.metrics import files_uploaded, files_deleted, commands_published
 
 logger = logging.getLogger(__name__)
 
 
 class FileService:
+    ALLOWED_EXTENSIONS = {"png", "jpg", "jpeg"}
+    MAX_FILE_SIZE = 10 * 1024 * 1024
+
     def __init__(
-            self,
-            session: AsyncSession,
-            file_repo: FileRepository,
-            s3_client: S3Client,
-            rabbitmq_producer: RabbitMQProducer,
-            redis_cache: Cache,
-            kafka_producer: KafkaProducer  
+        self, session: AsyncSession, file_repo: FileRepository,
+        s3_client: S3Client, rabbitmq_producer: RabbitMQProducer,
+        redis_cache: Cache, kafka_producer: KafkaProducer,
     ) -> None:
         self._session = session
         self._file_repo = file_repo
         self._s3_client = s3_client
         self._rabbitmq_producer = rabbitmq_producer
         self._redis_cache = redis_cache
-        self._kafka_producer = kafka_producer  
-
-    ALLOWED_EXTENSIONS = {"png", "jpg", "jpeg"}
-
-    @staticmethod
-    def _verify_filename(filename: str | None) -> str:
-        if filename is None or len(filename) == 0:
-            logger.warning("File name is None")
-            raise FilenameMissedError()
-
-        if "." not in filename:
-            logger.warning("Invalid file name")
-            raise InvalidFilenameError()
-
-        return filename
-
-    @classmethod
-    def _verify_file_extension(cls, filename: str) -> None:
-        extension = filename.rsplit(".", maxsplit=1)[-1].lower()
-
-        if extension not in cls.ALLOWED_EXTENSIONS:
-            logger.warning("Not allowed file extension for filename=%s", filename)
-            raise ForbiddenFileExtensionError()
-
-    @staticmethod
-    def _verify_file_size(size: int | None) -> int:
-        if size is None:
-            logger.warning("File size is None")
-            raise InvalidFileFormatError("File size cannot be None")
-
-        return size
-
-    @staticmethod
-    def _get_filename(file: UploadFile) -> str:
-        assert file.filename is not None
-        return PurePath(file.filename).name
+        self._kafka_producer = kafka_producer
 
     @classmethod
     def _verify_file(cls, file: UploadFile) -> None:
-        filename = cls._verify_filename(file.filename)
-        cls._verify_file_extension(filename)
-        cls._verify_file_size(file.size)
-
-    @staticmethod
-    def _create_original_key(file_extension: str) -> str:
-        return f"files/{uuid4()}/original.{file_extension}"
-
-    @staticmethod
-    def _get_file_extension(filename: str) -> str:
-        return filename.rsplit(".", maxsplit=1)[-1].lower()
+        if not file.filename:
+            raise FilenameMissedError()
+        if "." not in file.filename:
+            raise InvalidFilenameError()
+        if file.filename.rsplit(".", 1)[-1].lower() not in cls.ALLOWED_EXTENSIONS:
+            raise ForbiddenFileExtensionError()
+        if file.content_type not in {"image/jpeg", "image/png"}:
+            raise InvalidFileFormatError("Only JPEG and PNG images are allowed")
+        if file.size is not None and not 0 < file.size <= cls.MAX_FILE_SIZE:
+            raise InvalidFileFormatError("File size must be between 1 byte and 10 MiB")
 
     async def _get_existing_file_by_id(self, file_id: str) -> FileORM:
         file = await self._file_repo.get_by_id(file_id)
         if file is None:
-            logger.warning("File with id=%s not found", file_id)
             raise FileORMNotFoundError()
         return file
 
-    @staticmethod
-    def _create_redis_key(file_id: str) -> str:
-        return f"file:{file_id}"
+    async def _invalidate_cache(self, file_id: str) -> None:
+        try:
+            await self._redis_cache.delete(f"file:{file_id}")
+        except RedisNotConnectedError:
+            logger.warning("Redis not connected")
+
+    async def _publish_event(self, file: FileORM, event_type: str) -> None:
+        await self._kafka_producer.publish_event(FileEventMessage(
+            event_type=event_type,
+            payload=FileEventMessagePayload(
+                file_id=file.id, size=file.size, content_type=file.content_type,
+            ),
+        ))
 
     async def update_file_status(self, file_id: str, new_status: FileStatuses) -> None:
-        logger.info(
-            "Starting to update file status file id=%s, new_status=%s",
-            file_id,
-            new_status.value
-        )
-
-        file = await self._file_repo.get_by_id(
-            file_id
-        )
-
-        if file is None:
-            logger.warning(
-                "File with id=%s not found while updating file status (id from s3)",
-                file_id
-            )
+        file = await self._get_existing_file_by_id(file_id)
+        if file.status in {FileStatuses.READY, FileStatuses.FAILED}:
             return
-
-        try:
-            await self._redis_cache.delete(
-                self._create_redis_key(file_id)
-            )
-        except RedisNotConnectedError:
-            logger.warning("Redis not connected")
-
         file.status = new_status
         await self._session.commit()
-
-        await self._kafka_producer.publish_event(
-            event=FileEventMessage(
-                event_type=FileEventsContentTypesEnum.FILE_STATUS_UPDATED,
-                payload=FileEventMessagePayload(
-                    file_id=file.id,
-                    size=file.size,
-                    content_type=file.content_type
-                )
-            )
-        )
-
-        logger.info(
-            "Status of file id=%s updated to %s",
-            file_id,
-            new_status.value
-        )
+        await self._invalidate_cache(file_id)
 
     async def handle_process_completed(self, file_id: str, thumbnail_key: str) -> None:
-        logger.info(
-            "Starting to handle event - file processed, file_id=%s, thumbnail_key=%s",
-            file_id,
-            thumbnail_key
-        )
-
-        file = await self._file_repo.get_by_id(
-            file_id
-        )
-
-        if file is None:
-            logger.warning("File with id=%s not found while processing event (id from s3)", file_id)
-            return
-
-        try:
-            await self._redis_cache.delete(
-                self._create_redis_key(file_id)
-            )
-        except RedisNotConnectedError:
-            logger.warning("Redis not connected")
-
-        file.status = FileStatuses.PROCESSED
+        file = await self._get_existing_file_by_id(file_id)
+        if thumbnail_key != f"files/{file_id}/thumbnail.jpg":
+            raise InvalidFileFormatError("Unexpected thumbnail key")
+        if file.status == FileStatuses.FAILED:
+            raise HTTPException(409, "File processing already failed")
+        file.status = FileStatuses.READY
         file.thumbnail_key = thumbnail_key
-
         await self._session.commit()
-
-        await self._kafka_producer.publish_event(
-            event=FileEventMessage(
-                event_type=FileEventsContentTypesEnum.FILE_PROCESSED,
-                payload=FileEventMessagePayload(
-                    file_id=file_id,
-                    size=file.size,
-                    content_type=file.content_type
-                )
-            )
-        )
-
-        logger.info(
-            "Event - file processed for file id=%s, completed. New thumbnail_key=%s",
-            file_id,
-            thumbnail_key
-        )
+        await self._invalidate_cache(file_id)
 
     async def upload_file(self, file: UploadFile) -> FileReadSchema:
-        logger.info("Starting to upload file, filename=%s", file.filename)
-
         self._verify_file(file)
-
-        filename = self._get_filename(file)
-
-        file_orm = await self._file_repo.create(
-            original_name=filename,
-            content_type=file.content_type or "application/octet-stream",
-            size=file.size,
-            original_key=self._create_original_key(self._get_file_extension(filename)),
-        )
-
-        await self._session.commit()
-
-        # Сохраняем файл в s3
+        body = await file.read(self.MAX_FILE_SIZE + 1)
+        if not 0 < len(body) <= self.MAX_FILE_SIZE:
+            raise InvalidFileFormatError("File size must be between 1 byte and 10 MiB")
+        filename = PurePath(file.filename.replace("\\", "/")).name
+        file_id = str(uuid4())
+        original_key = f"files/{file_id}/original.{filename.rsplit('.', 1)[-1].lower()}"
         try:
-            await self._s3_client.upload_file(
-                body=await file.read(),
-                key=file_orm.original_key
-            )
-        except Exception as e:
-            logger.error("Exception: %s during upload file to s3", e)
+            await self._s3_client.upload_file(body, original_key, file.content_type)
+        except Exception as exc:
+            logger.exception("Original upload failed file_id=%s", file_id)
+            raise S3ServiceError() from exc
 
-            await self._kafka_producer.publish_event(
-                                event=FileEventMessage(
-                                    event_type=FileEventsContentTypesEnum.FILE_UPLOADING_FAILED,
-                                    payload=FileEventMessagePayload(
-                                        file_id=file_orm.id,
-                                        size=file_orm.size,
-                                        content_type=file_orm.content_type
-                                    )
-                                )
-                            )
-
-            raise S3ServiceError()
-
-        # Отправляем сообщение в ProcessService
         try:
-            await self._rabbitmq_producer.publish_event(
-                event=ProcessCommandEvent(
-                    file_id=file_orm.id,
-                    original_key=file_orm.original_key
-                )
+            file_orm = await self._file_repo.create(
+                original_name=filename, content_type=file.content_type,
+                size=len(body), original_key=original_key, file_id=file_id,
             )
-        except Exception as e:
-            logger.error(
-                "Exception: %s during publishing command to process-service with original key=%s to rabbitmq",
-                e,
-                file_orm.original_key
-            )
+            await self._session.commit()
+        except Exception:
+            await self._session.rollback()
+            await self._s3_client.delete_file(original_key)
+            raise
 
-            await self._kafka_producer.publish_event(
-                                event=FileEventMessage(
-                                    event_type=FileEventsContentTypesEnum.FILE_UPLOADING_FAILED,
-                                    payload=FileEventMessagePayload(
-                                        file_id=file_orm.id,
-                                        size=file_orm.size,
-                                        content_type=file_orm.content_type
-                                    )
-                                )
-                            )
-
-            raise RabbitMQServiceError()
-
-        await self._kafka_producer.publish_event(
-                    event=FileEventMessage(
-                        event_type=FileEventsContentTypesEnum.FILE_UPLOADED,
-                        payload=FileEventMessagePayload(
-                            file_id=file_orm.id,
-                            size=file_orm.size,
-                            content_type=file_orm.content_type
-                        )
-                    )
-                )
-
-        logger.info(
-            "File filename=%s uploaded. File id=%s",
-            file.filename,
-            file_orm.original_key
-        )
-
+        # The row is committed before the processor can receive the command.
+        await self._publish_event(file_orm, FileEventsContentTypesEnum.FILE_UPLOADED)
+        try:
+            await self._rabbitmq_producer.publish_event(ProcessCommandEvent(
+                file_id=file_id, original_key=original_key,
+            ))
+            commands_published.inc()
+        except Exception:
+            # A publish timeout can mean that the broker accepted the command.
+            # Keep UPLOADED so a delivered command can still finish processing.
+            logger.exception("Command publication failed file_id=%s", file_id)
+            raise HTTPException(503, f"Command delivery uncertain; check file {file_id}")
+        files_uploaded.inc()
+        logger.info("File uploaded file_id=%s", file_id)
         return FileReadSchema.model_validate(file_orm)
 
     async def get_files_history(self, page: int, per_page: int) -> list[FileReadSchema]:
-        logger.info(
-            "Starting to get files history, page=%d, per_page=%d",
-            page,
-            per_page
-        )
-
-        offset = (page - 1) * per_page
-        files = await self._file_repo.get_all(offset=offset, limit=per_page)
-
-        logger.info("Got %d files for history", len(files))
-
+        files = await self._file_repo.get_all(offset=(page - 1) * per_page, limit=per_page)
         return [FileReadSchema.model_validate(file) for file in files]
 
     async def get_file_by_id(self, file_id: str) -> FileReadSchema:
-        logger.info("Starting to get file by id=%s", file_id)
-
         try:
-            file_cached = await self._redis_cache.get(
-                self._create_redis_key(file_id)
-            )
+            cached = await self._redis_cache.get(f"file:{file_id}")
+            if cached is not None:
+                return FileReadSchema.model_validate_json(cached)
         except RedisNotConnectedError:
             logger.warning("Redis not connected")
-        else:
-            if file_cached is not None:
-                return FileReadSchema.model_validate_json(file_cached)
-
-        file_orm = await self._get_existing_file_by_id(file_id)
-        file_read = FileReadSchema.model_validate(file_orm)
-
+        file = FileReadSchema.model_validate(await self._get_existing_file_by_id(file_id))
         try:
-            await self._redis_cache.set(
-                key=self._create_redis_key(file_id),
-                value=file_read.model_dump_json()
-            )
+            await self._redis_cache.set(f"file:{file_id}", file.model_dump_json())
         except RedisNotConnectedError:
             logger.warning("Redis not connected")
-
-        logger.info("File id=%s got", file_id)
-
-        return file_read
+        return file
 
     async def download_file(self, file_id: str) -> DownloadFileSchema:
-        logger.info("Starting to download file id=%s", file_id)
-
         file = await self._get_existing_file_by_id(file_id)
-
-        try:
-            original_url = await self._s3_client.create_presigned_url(
-                key=file.original_key
-            )
-            thumbnail_url = await self._s3_client.create_presigned_url(
-                key=file.thumbnail_key
-            ) if file.thumbnail_key else None
-        except Exception as e:
-            logger.error("Exception: %s during creating presigned urls", e)
-
-            await self._kafka_producer.publish_event(
-                event=FileEventMessage(
-                    event_type=FileEventsContentTypesEnum.FILE_DOWNLOADING_FAILED,
-                    payload=FileEventMessagePayload(
-                        file_id=file.id,
-                        size=file.size,
-                        content_type=file.content_type
-                    )
-                )
-            )
-
-            raise S3ServiceError()
-
-        await self._kafka_producer.publish_event(
-            event=FileEventMessage(
-                event_type=FileEventsContentTypesEnum.FILE_DOWNLOADED,
-                payload=FileEventMessagePayload(
-                    file_id=file.id,
-                    size=file.size,
-                    content_type=file.content_type
-                )
-            )
-        )
-
-        logger.info("File id=%s downloaded", file_id)
-
         return DownloadFileSchema(
-            original_url=original_url,
-            thumbnail_url=thumbnail_url
+            original_url=await self._s3_client.create_presigned_url(file.original_key),
+            thumbnail_url=await self._s3_client.create_presigned_url(file.thumbnail_key)
+            if file.thumbnail_key else None,
         )
 
     async def delete_file(self, file_id: str) -> None:
-        logger.info("Starting to delete file id=%s", file_id)
-
         file = await self._get_existing_file_by_id(file_id)
-
-        try:
-            await self._redis_cache.delete(
-                self._create_redis_key(file_id)
-            )
-        except RedisNotConnectedError:
-            logger.warning("Redis not connected")
-
+        if file.status in {FileStatuses.UPLOADED, FileStatuses.PROCESSING}:
+            raise HTTPException(409, "Wait until file processing finishes")
+        await self._s3_client.delete_file(file.original_key)
+        if file.thumbnail_key:
+            await self._s3_client.delete_file(file.thumbnail_key)
         await self._file_repo.delete(file)
-
         await self._session.commit()
-
-        try:
-            await self._s3_client.delete_file(
-                key=file.original_key
-            )
-            if file.thumbnail_key:
-                await self._s3_client.delete_file(
-                    key=file.thumbnail_key
-                )
-        except Exception as e:
-            logger.error("Exception: %s during deleting file from s3", e)
-
-            await self._kafka_producer.publish_event(
-                event=FileEventMessage(
-                    event_type=FileEventsContentTypesEnum.FILE_DELETING_FAILED,
-                    payload=FileEventMessagePayload(
-                        file_id=file.id,
-                        size=file.size,
-                        content_type=file.content_type
-                    )
-                )
-            )
-
-            raise S3ServiceError()
-
-        await self._kafka_producer.publish_event(
-            event=FileEventMessage(
-                event_type=FileEventsContentTypesEnum.FILE_DELETED,
-                payload=FileEventMessagePayload(
-                    file_id=file.id,
-                    size=file.size,
-                    content_type=file.content_type
-                )
-            )
-        )
-
-        logger.info("File id=%s deleted", file_id)
+        await self._invalidate_cache(file_id)
+        await self._publish_event(file, FileEventsContentTypesEnum.FILE_DELETED)
+        files_deleted.inc()
+        logger.info("File deleted file_id=%s", file_id)
