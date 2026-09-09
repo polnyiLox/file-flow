@@ -6,49 +6,34 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class MongoDBSettings(BaseModel):
-    user: str
-    password: str
-    host: str
-    port: int
-    name: str
+    user: str = "analytics"
+    password: str = "analytics"
+    host: str = "localhost"
+    port: int = 27017
+    name: str = "analytics"
     auth_source: str = "admin"
 
     @property
     def url(self) -> str:
-        user = quote(self.user, safe="")
-        password = quote(self.password, safe="")
-        auth_source = quote(self.auth_source, safe="")
         return (
-            f"mongodb://{user}:{password}@{self.host}:{self.port}/"
-            f"?authSource={auth_source}"
+            f"mongodb://{quote(self.user, safe='')}:{quote(self.password, safe='')}"
+            f"@{self.host}:{self.port}/?authSource={quote(self.auth_source, safe='')}"
         )
 
 
-class ApiSettings(BaseModel):
-    v1_prefix: str
-    host: str
-    port: int
-    reload: bool
-
-
-class MiddlewareSettings(BaseModel):
-    allow_origins: list[str]
-    allow_methods: list[str]
-    allow_headers: list[str]
-    allow_credentials: bool
+class KafkaSettings(BaseModel):
+    bootstrap_servers: list[str] = ["localhost:9092"]
+    client_id: str = "analytics-service"
+    group_id: str = "analytics-service"
+    file_events_topic: str = "file.events"
 
 
 class Settings(BaseSettings):
-    mongodb: MongoDBSettings
-    api: ApiSettings
-    middleware: MiddlewareSettings
-
+    mongodb: MongoDBSettings = MongoDBSettings()
+    kafka: KafkaSettings = KafkaSettings()
     model_config = SettingsConfigDict(
-        env_file=".env",
-        env_prefix="APP_CONFIG__",
-        env_nested_delimiter="__",
-        extra="ignore",
-        case_sensitive=False,
+        env_file=".env", env_prefix="APP_CONFIG__", env_nested_delimiter="__",
+        extra="ignore", case_sensitive=False,
     )
 
 
